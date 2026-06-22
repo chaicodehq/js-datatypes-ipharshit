@@ -28,10 +28,6 @@
  *   - Items with qty <= 0 ko skip karo
  *   - Hint: Use map(), reduce(), filter(), split(), parseFloat(),
  *     toFixed(), Math.max(), Math.min(), toLowerCase()
- *
- * Validation:
- *   - Agar cart array nahi hai ya empty hai, return null
- *
  * @param {Array<{ name: string, price: number, qty: number, addons?: string[] }>} cart
  * @param {string} [coupon] - Optional coupon code
  * @returns {{ items: Array<{ name: string, qty: number, basePrice: number, addonTotal: number, itemTotal: number }>, subtotal: number, deliveryFee: number, gst: number, discount: number, grandTotal: number } | null}
@@ -46,5 +42,89 @@
  *   // grandTotal: 1000 + 0 + 50 - 150 = 900
  */
 export function buildZomatoOrder(cart, coupon) {
-  // Your code here
+  // Validation
+  if (!Array.isArray(cart) || cart.length === 0) {
+    return null;
+  }
+
+  // Skip items with qty <= 0
+  const validItems = cart.filter(item => item.qty > 0);
+
+  // Build item breakdown
+  const items = validItems.map(item => {
+    const addonTotal = (item.addons || []).reduce((sum, addon) => {
+      const parts = addon.split(":");
+      return sum + Number(parts[1]);
+    }, 0);
+
+    const itemTotal = (item.price + addonTotal) * item.qty;
+
+    return {
+      name: item.name,
+      qty: item.qty,
+      basePrice: item.price,
+      addonTotal,
+      itemTotal
+    };
+  });
+
+  // Subtotal
+  const subtotal = items.reduce(
+    (sum, item) => sum + item.itemTotal,
+    0
+  );
+
+  // Delivery Fee
+  let deliveryFee;
+
+  if (subtotal < 500) {
+    deliveryFee = 30;
+  } else if (subtotal < 1000) {
+    deliveryFee = 15;
+  } else {
+    deliveryFee = 0;
+  }
+
+  // GST (5%)
+  const gst = parseFloat((subtotal * 0.05).toFixed(2));
+
+  // Discount
+  let discount = 0;
+
+  coupon = (coupon || "").toLowerCase();
+
+  switch (coupon) {
+    case "first50":
+      discount = Math.min(subtotal * 0.5, 150);
+      break;
+
+    case "flat100":
+      discount = 100;
+      break;
+
+    case "freeship":
+      discount = deliveryFee;
+      deliveryFee = 0;
+      break;
+
+    default:
+      discount = 0;
+  }
+
+  // Grand Total
+  const grandTotal = parseFloat(
+    Math.max(
+      0,
+      subtotal + deliveryFee + gst - discount
+    ).toFixed(2)
+  );
+
+  return {
+    items,
+    subtotal,
+    deliveryFee,
+    gst,
+    discount,
+    grandTotal
+  };
 }
